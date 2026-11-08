@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Diwali Patakha Night 2.5D Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #06030c;
+            font-family: 'Poppins', sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .diwali-font {
+            font-family: 'Cinzel Decorative', cursive;
+        }
+        .gold-border {
+            border: 2px solid #f39c12;
+            box-shadow: 0 0 15px rgba(243, 156, 18, 0.4), inset 0 0 10px rgba(243, 156, 18, 0.2);
+        }
+        .patakha-card {
+            transition: all 0.2s ease-out;
+        }
+        .patakha-card:hover, .patakha-card.selected {
+            transform: translateY(-4px) scale(1.05);
+        }
+        #joystickContainer {
+            touch-action: none;
+        }
+        #menuContainer {
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #menuContainer.collapsed {
+            transform: translateY(calc(100% - 38px));
+        }
+        #menuArrow {
+            transition: transform 0.3s ease;
+        }
+        #menuContainer.collapsed #menuArrow {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="relative w-full h-full text-white overflow-hidden">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Portrait Orientation Warning Overlay -->
+    <div id="portraitWarning" class="hidden fixed inset-0 bg-slate-950/95 z-50 flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-20 h-20 mb-4 text-amber-400 animate-pulse flex items-center justify-center border-2 border-amber-400 rounded-2xl">
+            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+            </svg>
+        </div>
+        <h2 class="diwali-font text-2xl sm:text-3xl font-bold text-amber-300 mb-2">Please Rotate Your Device</h2>
+        <p class="text-sm text-amber-100/70 max-w-xs">For the best 2.5D festive experience, please play in Landscape Mode.</p>
+    </div>
+
+    <!-- HUD Overlay Top Left: Energy & Title -->
+    <div class="absolute top-3 left-3 z-20 flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 bg-black/60 backdrop-blur-md px-4 py-2 rounded-2xl border border-amber-500/30">
+        <div class="flex items-center space-x-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+            <span class="text-xs sm:text-sm font-semibold tracking-wider text-amber-200 uppercase">Diwali Night</span>
+        </div>
+        <!-- Energy Bar -->
+        <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold text-amber-400 flex items-center">⚡ <span id="energyText" class="ml-1">50/50</span></span>
+            <div class="w-24 sm:w-32 h-3.5 bg-black/50 border border-amber-500/40 rounded-full overflow-hidden p-0.5">
+                <div id="energyFill" class="h-full bg-gradient-to-r from-amber-500 to-yellow-300 rounded-full transition-all duration-300" style="width: 100%;"></div>
+            </div>
+        </div>
+        <!-- Eat Mithai HUD Button -->
+        <button id="btnEatMithai" class="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border border-yellow-300 text-amber-950 font-bold text-xs rounded-xl shadow-md active:scale-95 transition flex items-center space-x-1">
+            <span>🍬 Eat Mithai (+10⚡)</span>
+        </button>
+    </div>
+
+    <!-- HUD Overlay Top Right: Pause & Quit Buttons -->
+    <div class="absolute top-3 right-3 z-20 flex items-center space-x-2">
+        <button id="btnPause" class="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md border border-amber-500/40 text-amber-200 font-bold text-xs sm:text-sm rounded-xl shadow-md active:scale-95 transition flex items-center space-x-1 cursor-pointer">
+            <span>⏸️ Pause</span>
+        </button>
+        <button id="btnQuitTop" class="px-3 py-1.5 bg-red-950/70 hover:bg-red-900/90 backdrop-blur-md border border-red-500/40 text-red-200 font-bold text-xs sm:text-sm rounded-xl shadow-md active:scale-95 transition flex items-center space-x-1 cursor-pointer">
+            <span>❌ Quit</span>
+        </button>
+    </div>
+
+    <!-- Floating Warning Toast (Out of Energy) -->
+    <div id="toastMsg" class="pointer-events-none fixed top-16 left-1/2 -translate-x-1/2 z-40 hidden bg-red-900/90 border border-red-500 text-red-100 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-2xl animate-bounce">
+        ⚠️ Out of Energy! Collect & Eat Sweets (Mithai) 🍬 to recharge!
+    </div>
+
+    <!-- Pause Modal -->
+    <div id="pauseModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center">
+        <div class="bg-stone-900 border-2 border-amber-500/50 p-6 sm:p-8 rounded-3xl max-w-sm w-full shadow-2xl flex flex-col items-center space-y-4">
+            <h2 class="diwali-font text-3xl font-bold text-amber-300">Game Paused</h2>
+            <div class="w-full space-y-3">
+                <button id="btnResume" class="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl font-bold text-sm shadow-lg active:scale-95 transition">Resume Game</button>
+                <button id="btnToggleAudio" class="w-full py-3 bg-white/10 border border-white/20 rounded-xl font-semibold text-sm hover:bg-white/20 active:scale-95 transition">🔊 Audio: ON</button>
+                <button id="btnQuitFromPause" class="w-full py-3 bg-red-600/30 border border-red-500/50 text-red-300 rounded-xl font-semibold text-sm hover:bg-red-600/50 active:scale-95 transition">Quit Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quit Confirmation Modal -->
+    <div id="quitModal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center">
+        <div class="bg-stone-900 border-2 border-red-500/50 p-6 sm:p-8 rounded-3xl max-w-sm w-full shadow-2xl flex flex-col items-center space-y-4">
+            <h2 class="diwali-font text-2xl sm:text-3xl font-bold text-red-400">Quit to Main Menu?</h2>
+            <p class="text-xs sm:text-sm text-stone-300">Your current progress on the street will be reset.</p>
+            <div class="w-full flex space-x-3 pt-2">
+                <button id="btnCancelQuit" class="flex-1 py-3 bg-white/10 border border-white/20 rounded-xl font-semibold text-sm hover:bg-white/20 active:scale-95 transition">Cancel</button>
+                <button id="btnConfirmQuit" class="flex-1 py-3 bg-gradient-to-r from-red-600 to-rose-700 rounded-xl font-bold text-sm text-white shadow-lg active:scale-95 transition">Yes, Quit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start & Title Overlay -->
+    <div id="audioStartOverlay" class="fixed inset-0 bg-black/85 z-50 flex flex-col items-center justify-center p-6 text-center backdrop-blur-sm">
+        <div class="w-16 h-16 mb-4 rounded-full bg-amber-500/20 flex items-center justify-center border-2 border-amber-400 animate-bounce">
+            <span class="text-3xl">🛕</span>
+        </div>
+        <h1 class="diwali-font text-3xl sm:text-5xl font-bold text-amber-300 mb-2">Happy Diwali!</h1>
+        <p class="text-xs sm:text-sm text-amber-100/80 max-w-md mb-4">Walk around the 2.5D street, collect Mithai 🍬 for energy, and light Patakhas with neighborhood kids!</p>
+        <button id="btnStartGame" class="px-8 py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 rounded-full font-bold text-sm text-white shadow-xl hover:scale-105 active:scale-95 transition">
+            ✨ Start Playing ✨
+        </button>
+    </div>
+
+    <!-- TOUCH & ACTION CONTROLS HUD -->
+    <div id="mobileControls" class="fixed bottom-12 left-4 right-4 z-20 flex justify-between items-end pointer-events-none">
+        <div id="joystickContainer" class="w-20 h-20 sm:w-24 sm:h-24 bg-black/50 backdrop-blur-md rounded-full border-2 border-amber-500/40 relative pointer-events-auto flex items-center justify-center shadow-2xl">
+            <div id="joystickKnob" class="w-8 h-8 sm:w-10 sm:h-10 bg-amber-500/80 rounded-full border border-amber-200 shadow-lg absolute transition-transform duration-75"></div>
+        </div>
+        <button id="btnAction" class="pointer-events-auto px-4 py-2.5 sm:px-6 sm:py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 border-2 border-amber-300 rounded-full font-bold text-xs sm:text-sm text-white shadow-2xl active:scale-95 flex items-center space-x-1.5 backdrop-blur-md">
+            <span>✨ Light Fuse (-2⚡)</span>
+        </button>
+    </div>
+
+    <!-- COLLAPSIBLE FIRECRACKER MENU -->
+    <div id="menuContainer" class="fixed bottom-0 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl bg-stone-950/95 backdrop-blur-xl border-t-2 border-x border-amber-500/50 rounded-t-2xl shadow-2xl flex flex-col collapsed">
+        <button id="btnToggleMenu" class="w-full h-8 sm:h-9 bg-gradient-to-r from-amber-600/30 via-amber-500/40 to-amber-600/30 hover:bg-amber-500/50 flex items-center justify-center space-x-2 rounded-t-2xl cursor-pointer text-amber-200 border-b border-amber-500/20 active:bg-amber-500/60">
+            <span class="text-xs font-bold tracking-wide uppercase">aur patakhe</span>
+            <svg id="menuArrow" class="w-4 h-4 text-amber-400 transform rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        <div class="flex items-center space-x-2 sm:space-x-3 overflow-x-auto hide-scrollbar p-2 sm:p-3 scroll-smooth max-h-24 sm:max-h-28" id="patakhaTray"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+        let isPaused = true;
+        let soundEnabled = true;
+
+        const maxEnergy = 50;
+        let currentEnergy = 50;
+
+        function updateEnergyUI() {
+            const fill = document.getElementById('energyFill');
+            const text = document.getElementById('energyText');
+            const pct = Math.max(0, Math.min(100, (currentEnergy / maxEnergy) * 100));
+            fill.style.width = pct + '%';
+            text.innerText = `${currentEnergy}/${maxEnergy}`;
+            fill.className = pct <= 20 ? 'h-full bg-gradient-to-r from-red-600 to-orange-500 rounded-full transition-all duration-300' : 'h-full bg-gradient-to-r from-amber-500 to-yellow-300 rounded-full transition-all duration-300';
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toastMsg');
+            toast.innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2500);
+        }
+
+        function checkOrientation() {
+            const warning = document.getElementById('portraitWarning');
+            warning.classList.toggle('hidden', window.innerHeight <= window.innerWidth);
+        }
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            checkOrientation();
+        });
+        checkOrientation();
+
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type, pitch = 1.0) {
+            if (!soundEnabled || !audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                if (type === 'sparkle') {
+                    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.05, audioCtx.sampleRate);
+                    const out = buf.getChannelData(0);
+                    for (let i = 0; i < out.length; i++) out[i] = Math.random() * 2 - 1;
+                    const src = audioCtx.createBufferSource(); src.buffer = buf;
+                    const flt = audioCtx.createBiquadFilter(); flt.type = 'highpass'; flt.frequency.value = 4000 * pitch;
+                    const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.06, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    src.connect(flt); flt.connect(gain); gain.connect(audioCtx.destination); src.start();
+                } else if (type === 'potash_thud') {
+                    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(180, now); osc.frequency.exponentialRampToValueAtTime(15, now + 0.6);
+                    gain.gain.setValueAtTime(1.0, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+                    osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(now + 0.6);
+                } else if (type === 'eat') {
+                    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(now + 0.15);
+                } else if (type === 'pop') {
+                    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                    osc.type = 'square'; osc.frequency.setValueAtTime(300 * pitch, now); osc.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+                    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                    osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(now + 0.08);
+                } else if (type === 'boom') {
+                    // Robust, loud, and long-lasting explosive boom synthesis for Aloo & Sutli bombs
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(130 * pitch, now);
+                    osc.frequency.exponentialRampToValueAtTime(15, now + 0.85);
+
+                    gain.gain.setValueAtTime(1.0, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.85);
+
+                    // White noise thunder rumble buffer
+                    const bufSize = audioCtx.sampleRate * 0.7;
+                    const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+                    const out = buf.getChannelData(0);
+                    for (let i = 0; i < bufSize; i++) {
+                        out[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.25));
+                    }
+                    const src = audioCtx.createBufferSource();
+                    src.buffer = buf;
+                    const flt = audioCtx.createBiquadFilter();
+                    flt.type = 'lowpass';
+                    flt.frequency.value = 750;
+                    const noiseGain = audioCtx.createGain();
+                    noiseGain.gain.setValueAtTime(0.95, now);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+
+                    src.connect(flt);
+                    flt.connect(noiseGain);
+                    noiseGain.connect(audioCtx.destination);
+                    src.start(now);
+                } else if (type === 'whistle') {
+                    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(500 * pitch, now); osc.frequency.exponentialRampToValueAtTime(3200 * pitch, now + 0.5);
+                    gain.gain.setValueAtTime(0.12, now); gain.gain.linearRampToValueAtTime(0.001, now + 0.5);
+                    osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(now + 0.5);
+                }
+            } catch(e){}
+        }
+
+        const PATAKHA_TYPES = [
+            { id: 'anar', name: 'Anar Fountain', icon: '🛕', desc: 'Conical shower of golden sparks', color: '#f39c12', energyCost: 2 },
+            { id: 'chakri', name: 'Chakri Spinner', icon: '🌀', desc: 'Spinning ground ring of fire', color: '#e67e22', energyCost: 2 },
+            { id: 'alooo', name: 'Aloo Bomb', icon: '🥔', desc: 'Heavy green explosive bomb', color: '#16a085', energyCost: 2 },
+            { id: 'bijli', name: 'Bijli Bomb', icon: '⚡', desc: 'Rapid bright red snap bomb', color: '#e74c3c', energyCost: 2 },
+            { id: 'sutli', name: 'Sutli Bomb', icon: '💣', desc: 'Classic jute rope loud bomb', color: '#2ecc71', energyCost: 2 },
+            { id: 'skyshot', name: '24 SkyShot', icon: '🎆', desc: 'Continuous 24 multi-color bursts', color: '#8e44ad', energyCost: 2 },
+            { id: 'rocket', name: 'Sky Rocket', icon: '🚀', desc: 'Soars high into night sky', color: '#3498db', energyCost: 2 },
+            { id: 'ladi', name: 'Ladi Garland', icon: '🧨', desc: 'Continuous chain popping crackers', color: '#d35400', energyCost: 2 },
+            { id: 'long_ladi', name: 'Long Ladi', icon: '🏮', desc: 'Double length continuous chain ladi', color: '#c0392b', energyCost: 3 },
+            { id: 'fuljhadi', name: 'Hand Fuljhadi', icon: '✨', desc: 'Handheld golden sparkler', color: '#f1c40f', energyCost: 2 },
+            { id: 'potash', name: 'Potash Pipe', icon: '🔫', desc: 'Flame plunger pipe (10 Energy)', color: '#d35400', energyCost: 10 }
+        ];
+
+        let selectedPatakha = PATAKHA_TYPES[0];
+        const trayContainer = document.getElementById('patakhaTray');
+        PATAKHA_TYPES.forEach((type, index) => {
+            const card = document.createElement('div');
+            card.className = `patakha-card flex-shrink-0 flex flex-col items-center justify-center w-18 sm:w-22 h-16 sm:h-18 rounded-xl cursor-pointer bg-white/5 border border-white/10 hover:border-amber-400/50 ${index === 0 ? 'selected gold-border bg-amber-500/20' : ''}`;
+            card.innerHTML = `<span class="text-xl sm:text-2xl mb-0.5">${type.icon}</span><span class="text-[10px] sm:text-xs font-bold text-amber-200 text-center leading-tight">${type.name}</span>`;
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.patakha-card').forEach(c => c.classList.remove('selected', 'gold-border', 'bg-amber-500/20'));
+                card.classList.add('selected', 'gold-border', 'bg-amber-500/20');
+                selectedPatakha = type;
+                playSound('sparkle');
+            });
+            trayContainer.appendChild(card);
+        });
+
+        const menuContainer = document.getElementById('menuContainer');
+        document.getElementById('btnToggleMenu').addEventListener('click', () => {
+            menuContainer.classList.toggle('collapsed');
+            playSound('sparkle');
+        });
+
+        const worldBounds = { width: 2200, height: 1400 };
+        const streetYMin = 350;
+        const streetYMax = 1250;
+        const camera = { x: 0, y: 0 };
+
+        const player = { x: 600, y: 700, targetX: 600, targetY: 700, speed: 4.5, vx: 0, vy: 0, facingAngle: 0, isWalking: false, animTimer: 0, shirtColor: '#e74c3c', pantsColor: '#f1c40f' };
+        const npcs = [
+            { x: 300, y: 550, targetX: 500, targetY: 600, speed: 1.8, shirt: '#3498db', animTimer: 0 },
+            { x: 1200, y: 800, targetX: 1000, targetY: 750, speed: 2.0, shirt: '#9b59b6', animTimer: 0 },
+            { x: 1600, y: 600, targetX: 1800, targetY: 650, speed: 1.5, shirt: '#2ecc71', animTimer: 0 }
+        ];
+
+        const MITHAI_TYPES = [
+            { name: 'Kaju Katli', icon: '💎' },
+            { name: 'Motichoor Ladoo', icon: '🟠' },
+            { name: 'Gulab Jamun', icon: '🤎' }
+        ];
+        let sweetsOnGround = [];
+
+        function spawnSweet(x, y) {
+            const m = MITHAI_TYPES[Math.floor(Math.random() * MITHAI_TYPES.length)];
+            sweetsOnGround.push({
+                x: x || (100 + Math.random() * (worldBounds.width - 200)),
+                y: y || (streetYMin + 30 + Math.random() * (streetYMax - streetYMin - 60)),
+                type: m,
+                floatOffset: Math.random() * Math.PI * 2
+            });
+        }
+        function initWorldSweets() {
+            sweetsOnGround = [];
+            for (let i = 0; i < 18; i++) spawnSweet();
+        }
+        initWorldSweets();
+
+        const houses = [];
+        for (let x = 100; x < worldBounds.width; x += 320) {
+            houses.push({ x: x, y: streetYMin - 20, w: 260, h: 220, color: Math.random() > 0.5 ? '#2c1e38' : '#1e2738', doorColor: '#d35400', windowGlow: Math.random() > 0.3 });
+        }
+
+        const diyas = [];
+        for (let i = 0; i < 45; i++) {
+            diyas.push({ x: 100 + Math.random() * (worldBounds.width - 200), y: streetYMin + 20 + Math.random() * (streetYMax - streetYMin - 40), flicker: Math.random() * Math.PI * 2 });
+        }
+
+        const petals = [];
+        for (let i = 0; i < 350; i++) {
+            petals.push({ x: Math.random() * worldBounds.width, y: streetYMin + Math.random() * (streetYMax - streetYMin), color: ['#f39c12', '#e74c3c', '#f1c40f', '#e67e22'][Math.floor(Math.random() * 4)], radius: 1.5 + Math.random() * 3.5 });
+        }
+
+        let placedPatakhas = [];
+        let aerialBursts = [];
+        let particles = [];
+        let screenShake = 0;
+
+        function resetGameState() {
+            player.x = 600; player.y = 700; player.targetX = 600; player.targetY = 700; player.vx = 0; player.vy = 0; player.facingAngle = 0; player.isWalking = false;
+            currentEnergy = maxEnergy; updateEnergyUI();
+            placedPatakhas = []; aerialBursts = []; particles = []; screenShake = 0;
+            initWorldSweets();
+        }
+
+        const keys = { w: false, a: false, s: false, d: false };
+        window.addEventListener('keydown', (e) => {
+            initAudio();
+            const k = e.key.toLowerCase();
+            if (k === 'w' || k === 'arrowup') keys.w = true;
+            if (k === 'a' || k === 'arrowleft') keys.a = true;
+            if (k === 's' || k === 'arrowdown') keys.s = true;
+            if (k === 'd' || k === 'arrowright') keys.d = true;
+            if (k === ' ' || k === 'e') tryIgniteNearby();
+        });
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || k === 'arrowup') keys.w = false;
+            if (k === 'a' || k === 'arrowleft') keys.a = false;
+            if (k === 's' || k === 'arrowdown') keys.s = false;
+            if (k === 'd' || k === 'arrowright') keys.d = false;
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (isPaused) return;
+            initAudio();
+            if (e.clientY > height - 90 || e.clientY < 60) return;
+            const worldX = e.clientX + camera.x;
+            const worldY = e.clientY + camera.y;
+            if (worldY >= streetYMin && worldY <= streetYMax) {
+                if (Math.hypot(worldX - player.x, worldY - player.y) < 140) {
+                    placedPatakhas.push({ id: selectedPatakha.id, type: selectedPatakha, x: worldX, y: worldY, lit: false, fuseTimer: 0, activeTimer: 0, shotsLeft: selectedPatakha.id === 'skyshot' ? 24 : 1, rotation: 0 });
+                    playSound('sparkle');
+                } else {
+                    player.targetX = worldX; player.targetY = worldY;
+                }
+            }
+        });
+
+        const joystickContainer = document.getElementById('joystickContainer');
+        const joystickKnob = document.getElementById('joystickKnob');
+        let joystickActive = false, joyTouchId = null;
+
+        const handleJoystickMove = (clientX, clientY) => {
+            const rect = joystickContainer.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const dx = clientX - centerX; const dy = clientY - centerY;
+            const dist = Math.hypot(dx, dy); const maxDist = rect.width / 2 - 10;
+            const angle = Math.atan2(dy, dx); const moveDist = Math.min(dist, maxDist);
+            joystickKnob.style.transform = `translate(${Math.cos(angle) * moveDist}px, ${Math.sin(angle) * moveDist}px)`;
+            if (dist > 8) {
+                player.vx = Math.cos(angle) * player.speed; player.vy = Math.sin(angle) * player.speed;
+                player.targetX = player.x; player.targetY = player.y;
+            } else { player.vx = 0; player.vy = 0; }
+        };
+
+        joystickContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault(); initAudio();
+            const touch = e.changedTouches[0]; joyTouchId = touch.identifier; joystickActive = true;
+            handleJoystickMove(touch.clientX, touch.clientY);
+        });
+        window.addEventListener('touchmove', (e) => {
+            if (!joystickActive) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joyTouchId) handleJoystickMove(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+            }
+        });
+        const resetJoystick = () => { joystickActive = false; joyTouchId = null; joystickKnob.style.transform = `translate(0px, 0px)`; player.vx = 0; player.vy = 0; };
+        window.addEventListener('touchend', resetJoystick);
+        window.addEventListener('touchcancel', resetJoystick);
+
+        document.getElementById('btnAction').addEventListener('click', () => { initAudio(); tryIgniteNearby(); });
+
+        const pauseModal = document.getElementById('pauseModal');
+        const quitModal = document.getElementById('quitModal');
+        const startOverlay = document.getElementById('audioStartOverlay');
+
+        document.getElementById('btnPause').addEventListener('click', () => { isPaused = true; pauseModal.classList.remove('hidden'); playSound('sparkle'); });
+        document.getElementById('btnResume').addEventListener('click', () => { isPaused = false; pauseModal.classList.add('hidden'); playSound('sparkle'); });
+        document.getElementById('btnToggleAudio').addEventListener('click', (e) => { soundEnabled = !soundEnabled; e.target.innerText = soundEnabled ? '🔊 Audio: ON' : '🔇 Audio: OFF'; });
+        document.getElementById('btnQuitTop').addEventListener('click', () => { isPaused = true; pauseModal.classList.add('hidden'); quitModal.classList.remove('hidden'); playSound('sparkle'); });
+        document.getElementById('btnQuitFromPause').addEventListener('click', () => { pauseModal.classList.add('hidden'); quitModal.classList.remove('hidden'); playSound('sparkle'); });
+        document.getElementById('btnCancelQuit').addEventListener('click', () => { quitModal.classList.add('hidden'); isPaused = false; playSound('sparkle'); });
+        document.getElementById('btnConfirmQuit').addEventListener('click', () => { quitModal.classList.add('hidden'); pauseModal.classList.add('hidden'); resetGameState(); isPaused = true; startOverlay.style.display = 'flex'; playSound('sparkle'); });
+        document.getElementById('btnStartGame').addEventListener('click', () => { initAudio(); startOverlay.style.display = 'none'; isPaused = false; playSound('sparkle'); });
+        document.getElementById('btnEatMithai').addEventListener('click', () => {
+            initAudio();
+            if (currentEnergy >= maxEnergy) { showToast("⚡ Energy is already full (50/50)!"); return; }
+            currentEnergy = Math.min(maxEnergy, currentEnergy + 10); updateEnergyUI(); playSound('eat');
+            createSparks(player.x, player.y - 20, 20, 4, ['#f1c40f', '#e67e22', '#ffffff']);
+            showToast("🍬 Ate Mithai! +10 Energy Restored!");
+        });
+
+        function tryIgniteNearby() {
+            const cost = selectedPatakha.energyCost || 2;
+            if (currentEnergy < cost) { showToast(`⚠️ Need ${cost}⚡ Energy! Eat Mithai 🍬 to recharge!`); return false; }
+            if (selectedPatakha.id === 'potash') {
+                currentEnergy = Math.max(0, currentEnergy - 10); updateEnergyUI(); screenShake = 30; playSound('potash_thud');
+                const angle = player.facingAngle; const muzzleX = player.x + Math.cos(angle) * 35; const muzzleY = player.y - 25 + Math.sin(angle) * 15;
+                for (let i = 0; i < 90; i++) {
+                    const spreadAngle = angle + (Math.random() - 0.5) * 0.75; const speed = 4 + Math.random() * 12;
+                    particles.push({ x: muzzleX, y: muzzleY, vx: Math.cos(spreadAngle) * speed, vy: Math.sin(spreadAngle) * speed, life: 1.0, decay: 0.03 + Math.random() * 0.04, color: ['#e74c3c', '#f39c12', '#f1c40f', '#ffffff', '#e67e22'][Math.floor(Math.random() * 5)], size: 3 + Math.random() * 5, gravity: 0.04 });
+                }
+                createSmoke(muzzleX, muzzleY, 15); return true;
+            }
+            let lit = false;
+            placedPatakhas.forEach(p => {
+                if (!p.lit && Math.hypot(p.x - player.x, p.y - player.y) < 90) {
+                    p.lit = true; p.fuseTimer = 40; lit = true;
+                    currentEnergy = Math.max(0, currentEnergy - cost); updateEnergyUI(); playSound('sparkle');
+                }
+            });
+            if (!lit) showToast("⚠️ Stand closer to a placed Patakha to light its fuse!");
+            return lit;
+        }
+
+        function createSparks(x, y, count, speedMax, colors, is3DHeight = 0) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2; const speed = 0.5 + Math.random() * speedMax;
+                particles.push({ x: x, y: y - is3DHeight, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - (is3DHeight > 0 ? 1 : 0), life: 1.0, decay: 0.02 + Math.random() * 0.03, color: Array.isArray(colors) ? colors[Math.floor(Math.random() * colors.length)] : colors, size: 1.5 + Math.random() * 2.5, gravity: 0.08 });
+            }
+        }
+        function createSmoke(x, y, amount = 1) {
+            for (let i = 0; i < amount; i++) {
+                particles.push({ x: x + (Math.random() - 0.5) * 12, y: y, vx: (Math.random() - 0.5) * 0.6, vy: -0.4 - Math.random() * 0.8, life: 1.0, decay: 0.008 + Math.random() * 0.01, color: 'rgba(210, 210, 220, 0.22)', size: 6 + Math.random() * 10, gravity: -0.01, isSmoke: true });
+            }
+        }
+
+        function update() {
+            if (isPaused) return;
+            if (!joystickActive) {
+                player.vx = 0; player.vy = 0;
+                if (keys.w) player.vy = -player.speed;
+                if (keys.s) player.vy = player.speed;
+                if (keys.a) player.vx = -player.speed;
+                if (keys.d) player.vx = player.speed;
+                if (player.vx !== 0 && player.vy !== 0) { player.vx *= 0.707; player.vy *= 0.707; }
+                if (player.vx === 0 && player.vy === 0 && (player.targetX !== player.x || player.targetY !== player.y)) {
+                    const dx = player.targetX - player.x; const dy = player.targetY - player.y; const dist = Math.hypot(dx, dy);
+                    if (dist > 5) { player.vx = (dx / dist) * player.speed; player.vy = (dy / dist) * player.speed; }
+                    else { player.x = player.targetX; player.y = player.targetY; }
+                }
+            }
+
+            player.x = Math.max(50, Math.min(worldBounds.width - 50, player.x + player.vx));
+            player.y = Math.max(streetYMin, Math.min(streetYMax, player.y + player.vy));
+            player.isWalking = (player.vx !== 0 || player.vy !== 0);
+            if (player.isWalking) { player.facingAngle = Math.atan2(player.vy, player.vx); player.animTimer += 0.25; }
+
+            npcs.forEach(npc => {
+                const dx = npc.targetX - npc.x; const dy = npc.targetY - npc.y; const dist = Math.hypot(dx, dy);
+                if (dist > 10) { npc.x += (dx / dist) * npc.speed; npc.y += (dy / dist) * npc.speed; npc.animTimer += 0.2; }
+                else { npc.targetX = 100 + Math.random() * (worldBounds.width - 200); npc.targetY = streetYMin + Math.random() * (streetYMax - streetYMin); }
+            });
+
+            camera.x += (player.x - width / 2 - camera.x) * 0.1;
+            camera.y += (player.y - height / 2 - camera.y) * 0.1;
+            camera.x = Math.max(0, Math.min(worldBounds.width - width, camera.x));
+            camera.y = Math.max(0, Math.min(worldBounds.height - height, camera.y));
+
+            if (selectedPatakha.id !== 'potash') {
+                const sparkHandX = player.x + Math.cos(player.facingAngle + 0.5) * 18;
+                const sparkHandY = player.y - 25 + Math.sin(player.facingAngle + 0.5) * 10;
+                createSparks(sparkHandX, sparkHandY, 2, 2.0, ['#ffb703', '#ffffff', '#fb8500']);
+            }
+
+            for (let i = sweetsOnGround.length - 1; i >= 0; i--) {
+                const sw = sweetsOnGround[i];
+                if (Math.hypot(sw.x - player.x, sw.y - player.y) < 30) {
+                    currentEnergy = Math.min(maxEnergy, currentEnergy + 10); updateEnergyUI(); playSound('eat');
+                    createSparks(sw.x, sw.y - 10, 15, 3.5, ['#f1c40f', '#2ecc71', '#ffffff']);
+                    sweetsOnGround.splice(i, 1); setTimeout(() => spawnSweet(), 4000);
+                }
+            }
+
+            for (let i = placedPatakhas.length - 1; i >= 0; i--) {
+                const p = placedPatakhas[i];
+                if (p.lit && p.fuseTimer > 0) { p.fuseTimer--; createSparks(p.x, p.y - 12, 3, 2.5, ['#ffb703', '#ffffff', '#e74c3c']); }
+                if (p.lit && p.fuseTimer <= 0) {
+                    p.activeTimer++;
+                    if (p.id === 'alooo') {
+                        screenShake = 26; playSound('boom', 0.5);
+                        createSparks(p.x, p.y - 10, 160, 14, ['#16a085', '#2ecc71', '#f39c12', '#ffffff']);
+                        createSmoke(p.x, p.y - 10, 20); placedPatakhas.splice(i, 1); continue;
+                    } else if (p.id === 'bijli') {
+                        screenShake = 12; playSound('pop', 2.0);
+                        createSparks(p.x, p.y - 8, 65, 9, ['#e74c3c', '#ffffff', '#f1c40f', '#ff0055']);
+                        createSmoke(p.x, p.y, 8); placedPatakhas.splice(i, 1); continue;
+                    } else if (p.id === 'sutli') {
+                        screenShake = 20; playSound('boom', 0.9);
+                        createSparks(p.x, p.y - 10, 130, 12, ['#2ecc71', '#f39c12', '#ffffff', '#27ae60']);
+                        createSmoke(p.x, p.y - 10, 15); placedPatakhas.splice(i, 1); continue;
+                    } else if (p.id === 'skyshot') {
+                        if (p.activeTimer % 10 === 0 && p.shotsLeft > 0) {
+                            p.shotsLeft--; playSound('whistle', 0.8 + Math.random() * 0.4);
+                            aerialBursts.push({ x: p.x + (Math.random() - 0.5) * 40, targetY: p.y - 300 - Math.random() * 150, currentY: p.y - 15, color: ['#8e44ad', '#3498db', '#e74c3c', '#2ecc71', '#f1c40f'][Math.floor(Math.random() * 5)] });
+                        }
+                        if (p.shotsLeft <= 0 && p.activeTimer > 280) { placedPatakhas.splice(i, 1); continue; }
+                    } else if (p.id === 'anar') {
+                        createSparks(p.x, p.y - 15, 7, 9, ['#f39c12', '#f1c40f', '#ffffff', '#e74c3c'], 18);
+                        createSmoke(p.x, p.y - 25, 1); if (p.activeTimer % 3 === 0) playSound('sparkle', 0.8);
+                        if (p.activeTimer > 180) { placedPatakhas.splice(i, 1); continue; }
+                    } else if (p.id === 'chakri') {
+                        p.rotation += 0.45;
+                        createSparks(p.x + Math.cos(p.rotation) * 24, p.y + Math.sin(p.rotation) * 12, 5, 4.5, ['#e67e22', '#f1c40f', '#e74c3c', '#3498db']);
+                        createSmoke(p.x, p.y, 1); if (p.activeTimer % 3 === 0) playSound('sparkle', 1.4);
+                        if (p.activeTimer > 190) { placedPatakhas.splice(i, 1); continue; }
+                    } else if (p.id === 'rocket') {
+                        if (p.activeTimer === 1) playSound('whistle', 1.1);
+                        p.y -= 9; createSparks(p.x, p.y, 4, 2, ['#3498db', '#f39c12']);
+                        if (p.activeTimer > 45) {
+                            screenShake = 12; playSound('boom', 1.2);
+                            createSparks(p.x, p.y, 100, 9, ['#3498db', '#e74c3c', '#f1c40f', '#ffffff']);
+                            createSmoke(p.x, p.y, 9); placedPatakhas.splice(i, 1); continue;
+                        }
+                    } else if (p.id === 'ladi') {
+                        if (p.activeTimer % 6 === 0) {
+                            const rx = p.x + (Math.random() - 0.5) * 50; playSound('pop', 1.5 + Math.random() * 0.5);
+                            createSparks(rx, p.y - 5, 22, 5.5, ['#e67e22', '#e74c3c', '#f1c40f']);
+                            createSmoke(rx, p.y - 5, 2); screenShake = 3;
+                        }
+                        if (p.activeTimer > 160) { placedPatakhas.splice(i, 1); continue; }
+                    } else if (p.id === 'long_ladi') {
+                        if (p.activeTimer % 5 === 0) {
+                            const rx = p.x + (Math.random() - 0.5) * 70; playSound('pop', 1.3 + Math.random() * 0.7);
+                            createSparks(rx, p.y - 5, 26, 6.0, ['#c0392b', '#e74c3c', '#f39c12', '#f1c40f']);
+                            createSmoke(rx, p.y - 5, 2); screenShake = 4;
+                        }
+                        if (p.activeTimer > 320) { placedPatakhas.splice(i, 1); continue; }
+                    } else if (p.id === 'fuljhadi') {
+                        createSparks(p.x, p.y - 20, 5, 3.5, ['#f1c40f', '#ffffff', '#e67e22']);
+                        if (p.activeTimer % 3 === 0) playSound('sparkle');
+                        if (p.activeTimer > 180) { placedPatakhas.splice(i, 1); continue; }
+                    }
+                }
+            }
+
+            for (let i = aerialBursts.length - 1; i >= 0; i--) {
+                const ab = aerialBursts[i]; ab.currentY -= 9;
+                createSparks(ab.x, ab.currentY, 2, 1.5, [ab.color, '#ffffff']);
+                if (ab.currentY <= ab.targetY) {
+                    screenShake = 7; playSound('boom', 1.4);
+                    createSparks(ab.x, ab.currentY, 75, 7.5, [ab.color, '#ffffff', '#f1c40f']);
+                    createSmoke(ab.x, ab.currentY, 6); aerialBursts.splice(i, 1);
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i]; pt.x += pt.vx; pt.y += pt.vy; pt.vy += pt.gravity; pt.life -= pt.decay;
+                if (pt.isSmoke) pt.size += 0.15;
+                if (pt.life <= 0) particles.splice(i, 1);
+            }
+
+            if (screenShake > 0) screenShake *= 0.9;
+        }
+
+        function drawCharacter(x, y, shirtColor, pantsColor, animTimer, isWalking, angle, isPlayer = false) {
+            ctx.save(); ctx.translate(x, y);
+            ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(0, 0, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
+            const legOffset = isWalking ? Math.sin(animTimer) * 6 : 0;
+            ctx.strokeStyle = pantsColor; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.moveTo(-4, -15); ctx.lineTo(-4 - legOffset, 0); ctx.moveTo(4, -15); ctx.lineTo(4 + legOffset, 0); ctx.stroke();
+            ctx.fillStyle = shirtColor; ctx.beginPath(); ctx.roundRect(-10, -35, 20, 22, 4); ctx.fill();
+            ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(0, -42, 9, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#f39c12'; ctx.beginPath(); ctx.arc(0, -45, 10, Math.PI, Math.PI * 2); ctx.fill();
+
+            if (isPlayer && selectedPatakha.id === 'potash') {
+                const handX = Math.cos(angle) * 22, handY = -28 + Math.sin(angle) * 12;
+                ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(handX, handY); ctx.stroke();
+                ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(handX, handY); ctx.lineTo(handX + Math.cos(angle) * 14, handY + Math.sin(angle) * 8); ctx.stroke();
+            } else {
+                const handX = Math.cos(angle) * 16, handY = -30 + Math.sin(angle) * 10;
+                ctx.strokeStyle = '#e0ac69'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(handX, handY); ctx.stroke();
+                ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(handX, handY); ctx.lineTo(handX + Math.cos(angle) * 12, handY + Math.sin(angle) * 8); ctx.stroke();
+                ctx.fillStyle = '#ffb703'; ctx.beginPath(); ctx.arc(handX + Math.cos(angle) * 12, handY + Math.sin(angle) * 8, 2.5, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        function drawPlacedPatakhaItem(p) {
+            ctx.save(); ctx.translate(p.x, p.y);
+            if (p.id === 'alooo') {
+                ctx.fillStyle = '#16a085'; ctx.beginPath(); ctx.arc(0, -8, 10, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 2; ctx.stroke();
+            } else if (p.id === 'bijli') {
+                ctx.fillStyle = '#e74c3c'; ctx.fillRect(-6, -12, 12, 12);
+            } else if (p.id === 'skyshot') {
+                ctx.fillStyle = '#8e44ad'; ctx.fillRect(-12, -20, 24, 20);
+                ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 9px Poppins'; ctx.textAlign = 'center'; ctx.fillText('24', 0, -6);
+            } else if (p.id === 'sutli') {
+                ctx.fillStyle = '#27ae60'; ctx.beginPath(); ctx.arc(0, -8, 9, 0, Math.PI * 2); ctx.fill();
+            } else if (p.id === 'anar') {
+                ctx.fillStyle = '#f39c12'; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(-10, 0); ctx.lineTo(10, 0); ctx.closePath(); ctx.fill();
+            } else if (p.id === 'chakri') {
+                ctx.rotate(p.rotation); ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.arc(0, -3, 10, 0, Math.PI * 2); ctx.fill();
+            } else if (p.id === 'rocket') {
+                ctx.fillStyle = '#3498db'; ctx.fillRect(-4, -18, 8, 14);
+            } else if (p.id === 'ladi') {
+                ctx.fillStyle = '#d35400';
+                for (let lx = -18; lx <= 18; lx += 6) ctx.fillRect(lx, -6, 4, 8);
+            } else if (p.id === 'long_ladi') {
+                ctx.fillStyle = '#c0392b';
+                for (let lx = -28; lx <= 28; lx += 5) ctx.fillRect(lx, -6, 3, 9);
+            } else if (p.id === 'fuljhadi') {
+                ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -18); ctx.stroke();
+            }
+
+            if (!p.lit) {
+                ctx.strokeStyle = '#ffb703'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(4, -20); ctx.stroke();
+                if (Math.hypot(p.x - player.x, p.y - player.y) < 70) {
+                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 10px Poppins'; ctx.textAlign = 'center'; ctx.fillText('Tap (-2⚡)', 0, -28);
+                }
+            }
+            ctx.restore();
+        }
+
+        function render() {
+            ctx.save();
+            if (screenShake > 0) ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+
+            ctx.fillStyle = '#06030c'; ctx.fillRect(0, 0, width, height);
+            ctx.save(); ctx.translate(-camera.x, -camera.y);
+
+            ctx.fillStyle = '#1a1824'; ctx.fillRect(0, streetYMin, worldBounds.width, streetYMax - streetYMin);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)'; ctx.lineWidth = 2;
+            for (let py = streetYMin; py <= streetYMax; py += 60) {
+                ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(worldBounds.width, py); ctx.stroke();
+            }
+
+            houses.forEach(h => {
+                ctx.fillStyle = h.color; ctx.fillRect(h.x, h.y, h.w, h.h);
+                ctx.fillStyle = h.doorColor; ctx.fillRect(h.x + h.w / 2 - 20, h.y + h.h - 60, 40, 60);
+                if (h.windowGlow) {
+                    ctx.fillStyle = '#f39c12'; ctx.shadowColor = '#f39c12'; ctx.shadowBlur = 15;
+                    ctx.fillRect(h.x + 30, h.y + 40, 35, 35); ctx.fillRect(h.x + h.w - 65, h.y + 40, 35, 35);
+                    ctx.shadowBlur = 0;
+                }
+            });
+
+            petals.forEach(pt => {
+                ctx.fillStyle = pt.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2); ctx.fill();
+            });
+
+            const time = Date.now() * 0.005;
+            diyas.forEach(d => {
+                const flick = Math.sin(time + d.flicker) * 3;
+                ctx.fillStyle = 'rgba(243, 156, 18, 0.15)'; ctx.beginPath(); ctx.arc(d.x, d.y, 25 + flick, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#d35400'; ctx.beginPath(); ctx.ellipse(d.x, d.y, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(d.x, d.y - 3, 3 + flick * 0.2, 0, Math.PI * 2); ctx.fill();
+            });
+
+            sweetsOnGround.forEach(sw => {
+                const floatY = Math.sin(time * 2 + sw.floatOffset) * 3;
+                ctx.fillStyle = 'rgba(255, 230, 0, 0.2)'; ctx.beginPath(); ctx.arc(sw.x, sw.y + floatY, 14, 0, Math.PI * 2); ctx.fill();
+                ctx.font = '16px Poppins'; ctx.textAlign = 'center'; ctx.fillText(sw.type.icon, sw.x, sw.y + floatY + 4);
+            });
+
+            const renderList = [];
+            renderList.push({ type: 'player', y: player.y });
+            npcs.forEach((npc, idx) => renderList.push({ type: 'npc', index: idx, y: npc.y }));
+            placedPatakhas.forEach((p, idx) => renderList.push({ type: 'patakha', index: idx, y: p.y }));
+            renderList.sort((a, b) => a.y - b.y);
+
+            renderList.forEach(item => {
+                if (item.type === 'player') drawCharacter(player.x, player.y, player.shirtColor, player.pantsColor, player.animTimer, player.isWalking, player.facingAngle, true);
+                else if (item.type === 'npc') {
+                    const npc = npcs[item.index];
+                    const angle = Math.atan2(npc.targetY - npc.y, npc.targetX - npc.x);
+                    drawCharacter(npc.x, npc.y, npc.shirt, '#34495e', npc.animTimer, true, angle, false);
+                } else if (item.type === 'patakha') drawPlacedPatakhaItem(placedPatakhas[item.index]);
+            });
+
+            aerialBursts.forEach(ab => {
+                ctx.fillStyle = ab.color; ctx.beginPath(); ctx.arc(ab.x, ab.currentY, 4, 0, Math.PI * 2); ctx.fill();
+            });
+
+            particles.forEach(pt => {
+                ctx.fillStyle = pt.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2); ctx.fill();
+            });
+
+            ctx.restore();
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            updateEnergyUI();
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
